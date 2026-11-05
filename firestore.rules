@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownsUser(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    match /users/{uid} {
+      allow read: if ownsUser(uid);
+      allow create: if ownsUser(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.role in ['farmer', 'buyer']
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'role', 'createdAt']);
+      allow update: if ownsUser(uid)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.role == resource.data.role;
+      allow delete: if false;
+    }
+
+    match /crop_listings/{listingId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.farmerId == request.auth.uid
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'farmer'
+        && request.resource.data.status == 'active'
+        && request.resource.data.quantity is number
+        && request.resource.data.quantity > 0
+        && request.resource.data.pricePerUnit is number
+        && request.resource.data.pricePerUnit > 0;
+      allow update: if signedIn()
+        && resource.data.farmerId == request.auth.uid
+        && request.resource.data.farmerId == resource.data.farmerId;
+      allow delete: if signedIn() && resource.data.farmerId == request.auth.uid;
+    }
+
+    match /marketplace_orders/{orderId} {
+      allow create: if signedIn()
+        && request.resource.data.buyerId == request.auth.uid
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'buyer'
+        && request.resource.data.farmerId is string
+        && request.resource.data.buyerId != request.resource.data.farmerId
+        && request.resource.data.quantity is number
+        && request.resource.data.quantity > 0
+        && request.resource.data.status == 'requested'
+        && exists(/databases/$(database)/documents/crop_listings/$(request.resource.data.listingId))
+        && get(/databases/$(database)/documents/crop_listings/$(request.resource.data.listingId)).data.status == 'active'
+        && request.resource.data.cropName == get(/databases/$(database)/documents/crop_listings/$(request.resource.data.listingId)).data.cropName
+        && request.resource.data.unit == get(/databases/$(database)/documents/crop_listings/$(request.resource.data.listingId)).data.unit
+        && get(/databases/$(database)/documents/crop_listings/$(request.resource.data.listingId)).data.farmerId == request.resource.data.farmerId
+        && request.resource.data.quantity <= get(/databases/$(database)/documents/crop_listings/$(request.resource.data.listingId)).data.quantity
+        && request.resource.data.unitPrice == get(/databases/$(database)/documents/crop_listings/$(request.resource.data.listingId)).data.pricePerUnit
+        && request.resource.data.totalPrice == request.resource.data.quantity * request.resource.data.unitPrice;
+      allow read: if signedIn()
+        && (resource.data.buyerId == request.auth.uid
+          || resource.data.farmerId == request.auth.uid);
+      allow update: if signedIn()
+        && resource.data.farmerId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status in ['accepted', 'rejected', 'completed'];
+      allow delete: if false;
+    }
+  }
+}

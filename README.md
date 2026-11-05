@@ -1,85 +1,81 @@
-<div align="center">
+# Khetiharii 🌾
 
-  <img src="assets/images/seller.png" alt="Khetiharii logo" width="120" />
+A farmer-first crop marketplace built with Flutter and Firebase.
 
-  # 🌾 Khetiharii
-  ### A farmer-first agricultural marketplace
+Khetiharii is designed to help farmers publish crop availability and connect directly with buyers. The current implementation includes email/password authentication, farmer/buyer account roles, crop listing creation and discovery, buyer order requests, and a farmer order inbox.
 
-  **Connecting farmers, buyers and local agricultural service providers.**
+## Current marketplace scope
 
-  [![Flutter](https://img.shields.io/badge/Flutter-Dart-02569B?logo=flutter)](https://flutter.dev)
-  [![Firebase](https://img.shields.io/badge/Backend-Firebase-FFCA28?logo=firebase)](https://firebase.google.com)
-  [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20Web-blue)](https://flutter.dev)
+| Capability | Implementation |
+|---|---|
+| Email/password registration and sign-in | Firebase Authentication |
+| Farmer and buyer roles | Firestore user profiles |
+| Publish crop listings | Firestore `crop_listings` |
+| Search active crops | Firestore prefix search |
+| Request to buy available quantity | Firestore transaction |
+| Buyer order history | Firestore query |
+| Farmer request inbox | Firestore query |
+| Accept, decline and complete orders | Role-checked Firestore updates |
+| Data access control | `firestore.rules` |
 
-</div>
+## Stack
 
-## About
+- Flutter / Dart
+- Firebase Authentication
+- Cloud Firestore
+- Provider (legacy cart demo remains during migration)
 
-Khetiharii is an AgriTech project focused on improving access to agricultural markets and essential farm services. Its intended ecosystem connects farmers with produce buyers, equipment owners, veterinarians and agricultural input suppliers.
+## Firebase setup
 
-The repository currently contains an early Flutter application foundation. The catalogue and cart use local demo data; production marketplace workflows and Firebase-backed data services are still planned.
+The Android Firebase configuration is already present in `android/google-services.json`. Its Android package identifier must match `com.example.khetiharii` (the Gradle namespace/application ID in this repository).
 
-## Product direction
-
-| Module | Intended capability | Current status |
-|---|---|---|
-| Farmer marketplace | Create crop listings and connect with buyers | Planned |
-| Buyer experience | Discover produce and place orders | Planned |
-| Equipment rental | List machinery and manage bookings | Planned |
-| Veterinary services | Discover vets and request consultations | Planned |
-| Agricultural inputs | Browse farm supplies | Local demo catalogue |
-| Smart farming | Weather and crop advisory | Planned |
-
-## Technology
-
-- Flutter and Dart for the cross-platform application
-- Provider for the current cart state
-- Firebase Core and Firebase Authentication dependencies are present
-- Firebase initialization, production authentication, Firestore repositories, security rules and deployment configuration still need to be completed
-
-## Getting started
-
-1. Install Flutter and the Dart SDK.
-2. Clone this repository:
+1. Install Flutter and Firebase CLI.
+2. Install dependencies: `flutter pub get`.
+3. Enable **Email/Password** in Firebase Authentication.
+4. Create a Cloud Firestore database.
+5. Deploy rules and indexes:
    ```bash
-   git clone https://github.com/Divyanshu8595/khetiharii.git
-   cd khetiharii
+   firebase deploy --only firestore:rules,firestore:indexes
    ```
-3. Install dependencies:
-   ```bash
-   flutter pub get
-   ```
-4. Configure Firebase for your own Firebase project using FlutterFire CLI:
-   ```bash
-   dart pub global activate flutterfire_cli
-   flutterfire configure
-   ```
-5. Run the app:
-   ```bash
-   flutter run
-   ```
-6. Run tests:
-   ```bash
-   flutter test
-   ```
+6. Run on Android: `flutter run`.
 
-Do not commit private service-account credentials or production secrets. Use your own Firebase project configuration and review platform-specific setup before release.
+The checked-in Firebase configuration only covers Android. Before running on iOS, web, macOS, Windows or Linux, configure each platform using FlutterFire CLI and provide its generated platform options. Do not assume Android configuration automatically configures other targets.
 
-## Development priorities
+## Data model
 
-- [ ] Configure Firebase initialization for supported platforms
-- [ ] Implement real email/password authentication and profile creation
-- [ ] Introduce role-based onboarding (farmer, buyer, equipment provider, veterinarian, input seller)
-- [ ] Build Firestore-backed crop listings and buyer discovery
-- [ ] Implement order lifecycle and notifications
-- [ ] Add equipment rental and veterinary workflows
-- [ ] Define Firestore security rules and automated tests
-- [ ] Add CI checks for formatting, analysis and tests
+### `users/{uid}`
+- `uid`, `name`, `email`, `role` (`farmer` or `buyer`), `createdAt`
 
-## Contributing
+### `crop_listings/{listingId}`
+- `farmerId`, `farmerName`, `cropName`, `cropNameLower`, `variety`, `description`
+- `quantity`, `unit`, `pricePerUnit`
+- `village`, `district`, `state`, `createdAt`, `status`
 
-Contributions are welcome. Create a feature branch, add tests for behavior changes, run `dart format .` and `flutter test`, then open a pull request.
+### `marketplace_orders/{orderId}`
+- `listingId`, `buyerId`, `farmerId`, `cropName`
+- `quantity`, `unit`, `unitPrice`, `totalPrice`, `status`, `createdAt`
 
-## License
+## Important production work still required
 
-See the repository license file.
+- Inventory reservation and order creation should be moved to a trusted callable Cloud Function. The current client transaction validates listing availability and creates a request, but intentionally does not decrement stock; client-side stock writes are not trusted.
+- Add server-side validation, rate limiting, audit logging and abuse protection.
+- Add phone verification and verified farmer/business profiles.
+- Add crop images using Firebase Storage with strict upload rules.
+- Add payment integration only after settlement, refunds, dispute handling and legal requirements are designed.
+- Add pagination, offline behavior, localization and accessibility checks.
+- Add emulator-based Firestore rules tests and CI.
+
+## Quality checks
+
+Before release, run:
+
+```bash
+dart format .
+flutter pub get
+flutter analyze
+flutter test
+```
+
+## Security
+
+Review `firestore.rules` against your actual business requirements before production deployment. Never ship service-account credentials in the mobile app.
